@@ -1,0 +1,12 @@
+echo 크기가 홀수여도 반환 주소는 HEAP_ALIGNMENT(8) 바이트 정렬
+heap_create 4096
+heap_alloc a 1
+heap_alloc b 3
+heap_alloc c 7
+heap_alloc d 13
+heap_alloc e 1
+expect aligned a
+expect aligned b
+expect aligned c
+expect aligned d
+expect aligned e

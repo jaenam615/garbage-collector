@@ -1,0 +1,14 @@
+echo 루트 스택에 있는 모든 루트에서 시작한다
+gc_create 4096
+gc_alloc a 0 8
+gc_push_root a
+gc_alloc b 0 8
+gc_push_root b
+gc_alloc c 0 8
+gc_push_root c
+gc_alloc d 0 8
+gc_mark
+expect marked a
+expect marked b
+expect marked c
+expect unmarked d

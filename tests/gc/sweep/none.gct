@@ -1,0 +1,9 @@
+echo 전부 mark 됐으면 아무것도 해제 안 함
+gc_create 4096
+gc_alloc a 0 16
+gc_alloc b 0 16
+object_set_marked a 1
+object_set_marked b 1
+gc_sweep
+expect result == 0
+expect live == 2

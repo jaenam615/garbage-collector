@@ -1,0 +1,9 @@
+echo 채우기 -> 전부 해제 -> 다시 채우기를 해도 같은 개수가 들어가야 한다
+heap_create 4096
+heap_fill 48
+let first filled
+heap_free_fill
+heap_fill 48
+expect filled == first
+expect fill-intact
+expect walk

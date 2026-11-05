@@ -1,0 +1,12 @@
+echo 꽉 찬 힙을 sweep으로 비우면 다시 같은 만큼 채울 수 있다
+gc_create 4096
+gc_fill 0 64
+expect filled > 0
+let first filled
+gc_pop_all
+gc_sweep
+expect result == first
+expect used == 0
+gc_fill 0 64
+expect filled == first
+expect fill-intact

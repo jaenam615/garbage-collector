@@ -1,0 +1,8 @@
+echo 힙이 모자라면 object_new는 NULL
+heap_create 1024
+object_new a 0 4096
+expect null a
+object_new b 200 0
+expect null b
+object_new c 1 8
+expect notnull c

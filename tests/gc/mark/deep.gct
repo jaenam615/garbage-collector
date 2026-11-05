@@ -1,0 +1,8 @@
+echo 길이 5만짜리 리스트. 테스트 스레드의 C 스택은 256KB라서
+echo 노드마다 재귀하는 mark는 스택이 터진다 (ASan: stack-overflow).
+echo 다음에 방문할 객체를 C 스택이 아닌 곳(직접 만든 스택/큐)에 쌓아야 한다.
+gc_create 8M
+gc_list head 50000
+gc_push_root head
+gc_mark
+expect all-marked head

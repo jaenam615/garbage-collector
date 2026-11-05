@@ -1,0 +1,11 @@
+echo GC로 해제된 자리에 새로 할당한 객체도 깨끗해야 한다
+gc_create 4096
+gc_alloc a 3 32
+write a GARBAGE_GARBAGE_GARBAGE
+object_set_ref a 0 a
+object_set_ref a 1 a
+object_set_ref a 2 a
+gc_collect
+expect freed == 1
+gc_alloc b 3 32
+expect zeroed b

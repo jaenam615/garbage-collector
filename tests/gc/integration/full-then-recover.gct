@@ -1,0 +1,9 @@
+echo 꽉 찬 힙에서 루트를 전부 빼면, 다음 gc_alloc은 자동 GC 후 성공한다
+gc_create 4096
+gc_fill 0 64
+gc_pop_all
+let before collections
+gc_alloc x 0 64
+expect notnull x
+expect collections > before
+expect live == 1

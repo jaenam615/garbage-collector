@@ -1,0 +1,12 @@
+echo 큰 빈 블록에 작은 요청이 오면 쪼개서 나머지를 남겨야 한다
+heap_create 4096
+heap_alloc a 3500
+heap_free a
+heap_alloc b 100
+expect notnull b
+heap_alloc c 1500
+expect notnull c
+write b BBBB
+write c CCCC
+expect data b BBBB
+expect walk

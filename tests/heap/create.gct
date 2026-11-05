@@ -1,0 +1,6 @@
+echo 빈 힙을 만들면 통계가 0이고, 순회해도 아무것도 안 나온다
+heap_create 1024
+expect size == 1024
+expect used == 0
+expect blocks == 0
+expect walk

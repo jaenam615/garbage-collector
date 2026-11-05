@@ -1,0 +1,12 @@
+echo 해제된 자리를 다시 쓸 수 있어야 한다
+heap_create 1024
+heap_alloc a 512
+heap_alloc b 256
+write b KEEP_B
+heap_alloc c 512
+expect null c
+heap_free a
+heap_alloc c 512
+expect notnull c
+expect data b KEEP_B
+expect walk

@@ -1,0 +1,5 @@
+echo 빈 힙에서 gc_collect
+gc_create 1024
+gc_collect
+expect freed == 0
+expect collections == 1

@@ -1,0 +1,7 @@
+echo 해제하면 통계가 원래대로 돌아온다
+heap_create 1024
+heap_alloc p 64
+heap_free p
+expect used == 0
+expect blocks == 0
+expect walk

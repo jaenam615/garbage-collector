@@ -1,0 +1,6 @@
+echo heap_free(NULL)은 아무것도 안 한다
+heap_create 1024
+heap_alloc p 16
+heap_free null
+expect blocks == 1
+expect walk

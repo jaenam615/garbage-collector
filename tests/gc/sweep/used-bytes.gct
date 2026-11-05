@@ -1,0 +1,10 @@
+echo used_bytes는 해제한 만큼 정확히 줄어든다
+gc_create 4096
+gc_alloc a 0 64
+let only_a used
+gc_alloc b 0 64
+gc_alloc c 2 32
+expect used > only_a
+object_set_marked a 1
+gc_sweep
+expect used == only_a

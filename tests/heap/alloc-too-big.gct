@@ -1,0 +1,8 @@
+echo 힙보다 큰 요청은 NULL. 그 뒤에도 정상 할당은 된다
+heap_create 1024
+heap_alloc big 4096
+expect null big
+expect blocks == 0
+expect used == 0
+heap_alloc p 16
+expect notnull p

@@ -1,0 +1,9 @@
+echo 루트에서 끊긴 순환 참조도 수거된다 (reference counting으로는 불가능)
+gc_create 4096
+gc_alloc a 1 8
+gc_alloc b 1 8
+object_set_ref a 0 b
+object_set_ref b 0 a
+gc_collect
+expect freed == 2
+expect live == 0

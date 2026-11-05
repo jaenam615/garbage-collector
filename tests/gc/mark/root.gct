@@ -1,0 +1,8 @@
+echo 루트에 있는 객체만 mark 된다
+gc_create 4096
+gc_alloc a 0 8
+gc_push_root a
+gc_alloc b 0 8
+gc_mark
+expect marked a
+expect unmarked b

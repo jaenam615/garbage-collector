@@ -1,0 +1,13 @@
+echo 연속으로 붙어 있는 객체들을 해제 (순회 중에 해제해도 다음 블록을 놓치면 안 된다)
+gc_create 4096
+gc_alloc a 0 32
+gc_alloc b 0 32
+gc_alloc c 0 32
+gc_alloc d 0 32
+gc_alloc e 0 32
+write e LAST
+object_set_marked e 1
+gc_sweep
+expect result == 4
+expect live == 1
+expect data e LAST

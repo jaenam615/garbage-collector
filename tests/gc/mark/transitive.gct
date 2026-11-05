@@ -1,0 +1,15 @@
+echo 루트에서 참조를 따라간다: a -> b -> c
+gc_create 4096
+gc_alloc a 1 8
+gc_push_root a
+gc_alloc b 1 8
+object_set_ref a 0 b
+gc_alloc c 0 8
+object_set_ref b 0 c
+gc_alloc garbage 1 8
+object_set_ref garbage 0 a
+gc_mark
+expect marked a
+expect marked b
+expect marked c
+expect unmarked garbage

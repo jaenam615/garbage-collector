@@ -1,0 +1,8 @@
+echo sweep은 루트를 보지 않는다. mark 결과만 믿는다
+gc_create 4096
+gc_alloc a 0 8
+gc_push_root a
+gc_sweep
+expect result == 1
+expect live == 0
+gc_pop_root

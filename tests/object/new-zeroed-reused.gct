@@ -1,0 +1,9 @@
+echo 이전에 쓰레기가 써 있던 메모리를 재사용해도 깨끗해야 한다
+heap_create 4096
+heap_alloc p 128
+write p GARBAGE_GARBAGE_GARBAGE_GARBAGE_GARBAGE_GARBAGE_GARBAGE_GARBAGE
+heap_free p
+object_new a 3 32
+expect zeroed a
+object_new b 0 64
+expect zeroed b

@@ -1,0 +1,9 @@
+echo 꽉 찰 때까지 할당하고, 다 찬 뒤에는 NULL
+heap_create 4096
+heap_fill 32
+expect filled > 0
+expect blocks == filled
+expect fill-intact
+heap_alloc x 32
+expect null x
+expect walk

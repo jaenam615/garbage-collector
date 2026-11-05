@@ -1,0 +1,9 @@
+echo 잘게 채운 뒤 전부 해제하면 힙 전체가 다시 한 덩어리가 되어야 한다
+heap_create 4096
+heap_fill 32
+heap_free_fill
+expect used == 0
+expect blocks == 0
+heap_alloc big 3000
+expect notnull big
+expect walk

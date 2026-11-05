@@ -1,0 +1,16 @@
+echo 양쪽이 빈 블록 사이를 해제하면 세 개가 하나로 합쳐져야 한다
+heap_create 4096
+heap_alloc a 800
+heap_alloc b 800
+heap_alloc c 800
+heap_alloc d 800
+write d KEEP_D
+heap_free a
+heap_free c
+heap_alloc x 2200
+expect null x
+heap_free b
+heap_alloc x 2200
+expect notnull x
+expect data d KEEP_D
+expect walk

@@ -1,0 +1,10 @@
+echo 전부 살아있으면 GC를 돌려도 자리가 없으니 NULL
+gc_create 4096
+gc_fill 0 64
+expect filled > 0
+let before collections
+gc_alloc x 0 64
+expect null x
+expect collections > before
+expect live == filled
+expect fill-intact

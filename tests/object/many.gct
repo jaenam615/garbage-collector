@@ -1,0 +1,5 @@
+echo 객체 100개
+heap_create 16K
+repeat 100 object_new t 2 16
+expect blocks == 100
+expect walk

@@ -1,0 +1,11 @@
+echo mark 안 된 객체는 해제된다 (mark는 손으로 켠다: gc_mark 구현과 무관하게 테스트)
+gc_create 4096
+gc_alloc a 0 16
+gc_alloc b 0 16
+gc_alloc c 0 16
+write a SURVIVOR
+object_set_marked a 1
+gc_sweep
+expect result == 2
+expect live == 1
+expect data a SURVIVOR

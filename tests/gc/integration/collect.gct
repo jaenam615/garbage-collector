@@ -1,0 +1,13 @@
+echo gc_collect = mark + sweep. 루트에서 닿는 것만 남는다
+gc_create 4096
+gc_alloc a 1 8
+gc_push_root a
+gc_alloc b 1 8
+object_set_ref a 0 b
+gc_alloc c 0 8
+gc_collect
+expect result == 1
+expect freed == 1
+expect live == 2
+expect collections == 1
+expect ref a 0 b

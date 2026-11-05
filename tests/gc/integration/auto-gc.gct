@@ -1,0 +1,5 @@
+echo 공간이 부족하면 gc_alloc이 스스로 GC를 돌린다 (4KB 힙에 64B 1000개)
+gc_create 4096
+repeat 1000 gc_alloc t 0 64
+expect notnull t
+expect collections >= 1

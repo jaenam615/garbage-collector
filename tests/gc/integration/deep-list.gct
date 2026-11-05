@@ -1,0 +1,13 @@
+echo 길이 5만 리스트를 살렸다가 통째로 버린다
+gc_create 8M
+gc_list head 50000
+gc_push_root head
+gc_collect
+expect freed == 0
+expect live == 50000
+expect listlen head 50000
+gc_pop_root
+gc_collect
+expect freed == 50000
+expect live == 0
+expect used == 0

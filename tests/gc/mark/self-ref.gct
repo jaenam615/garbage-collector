@@ -1,0 +1,7 @@
+echo 자기 자신을 참조해도 무한 루프에 빠지면 안 된다
+gc_create 4096
+gc_alloc a 1 8
+object_set_ref a 0 a
+gc_push_root a
+gc_mark
+expect marked a

@@ -1,0 +1,9 @@
+echo 짧은 리스트를 계속 만들고 버리는 동안, 루트에 있는 긴 리스트는 살아있어야 한다
+gc_create 64K
+gc_list keep 100
+gc_push_root keep
+repeat 2000 gc_list tmp 20
+expect listlen keep 100
+expect collections >= 1
+gc_collect
+expect live == 100

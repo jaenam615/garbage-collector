@@ -1,0 +1,16 @@
+echo 순환 참조: 루트에 닿는 사이클은 mark, 닿지 않는 사이클은 unmarked
+gc_create 4096
+gc_alloc a 1 8
+gc_push_root a
+gc_alloc b 1 8
+object_set_ref a 0 b
+object_set_ref b 0 a
+gc_alloc x 1 8
+gc_alloc y 1 8
+object_set_ref x 0 y
+object_set_ref y 0 x
+gc_mark
+expect marked a
+expect marked b
+expect unmarked x
+expect unmarked y

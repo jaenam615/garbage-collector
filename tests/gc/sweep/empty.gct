@@ -1,0 +1,5 @@
+echo 빈 힙에서 sweep
+gc_create 4096
+gc_sweep
+expect result == 0
+expect live == 0

@@ -1,0 +1,15 @@
+echo 첫 번째 참조만이 아니라 모든 참조 슬롯을 따라간다 (중간에 NULL이 있어도)
+gc_create 4096
+gc_alloc a 4 0
+gc_push_root a
+gc_alloc b 0 8
+gc_alloc c 0 8
+gc_alloc d 0 8
+object_set_ref a 0 b
+object_set_ref a 2 c
+object_set_ref a 3 d
+gc_mark
+expect marked a
+expect marked b
+expect marked c
+expect marked d

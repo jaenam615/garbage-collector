@@ -1,0 +1,7 @@
+echo 참조 슬롯이 512개인 객체
+gc_create 1M
+gc_alloc a 512 0
+gc_push_root a
+gc_fanout a
+gc_mark
+expect all-marked a

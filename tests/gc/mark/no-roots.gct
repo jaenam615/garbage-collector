@@ -1,0 +1,7 @@
+echo 루트가 없으면 아무것도 mark 되지 않는다
+gc_create 4096
+gc_alloc a 1 8
+gc_alloc b 1 8
+gc_mark
+expect unmarked a
+expect unmarked b

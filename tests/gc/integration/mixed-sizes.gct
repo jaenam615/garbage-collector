@@ -1,0 +1,16 @@
+echo 크기가 제각각인 객체를 수거하고 다시 할당
+gc_create 8192
+gc_alloc keep 1 16
+write keep KEEP
+gc_push_root keep
+repeat 20 gc_alloc small 0 8
+repeat 10 gc_alloc mid 2 100
+repeat 5 gc_alloc big 4 400
+gc_collect
+expect live == 1
+gc_alloc big2 4 400
+gc_push_root big2
+gc_alloc small2 0 8
+gc_push_root small2
+expect live == 3
+expect data keep KEEP

@@ -1,0 +1,14 @@
+echo 참조 슬롯 읽기/쓰기
+heap_create 4096
+object_new a 3 0
+object_new b 0 8
+object_new c 0 8
+object_set_ref a 0 b
+object_set_ref a 2 c
+expect ref a 0 b
+expect ref a 1 null
+expect ref a 2 c
+object_set_ref a 1 a
+expect ref a 1 a
+object_set_ref a 0 null
+expect ref a 0 null

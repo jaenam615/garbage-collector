@@ -1,0 +1,18 @@
+echo 여러 번 collect: 참조를 끊거나 루트를 빼면 다음 collect에서 수거된다
+gc_create 4096
+gc_alloc a 1 8
+gc_push_root a
+gc_alloc b 0 8
+object_set_ref a 0 b
+gc_collect
+expect freed == 0
+gc_collect
+expect freed == 0
+object_set_ref a 0 null
+gc_collect
+expect freed == 1
+gc_pop_root
+gc_collect
+expect freed == 1
+expect live == 0
+expect collections == 4

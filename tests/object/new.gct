@@ -1,0 +1,6 @@
+echo 객체 하나 만들기
+heap_create 4096
+object_new a 2 16
+expect notnull a
+expect shape a 2 16
+expect blocks == 1

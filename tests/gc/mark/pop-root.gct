@@ -1,0 +1,10 @@
+echo pop한 루트는 mark 시작점이 아니다. pop은 마지막에 push한 것부터 뺀다
+gc_create 4096
+gc_alloc a 0 8
+gc_push_root a
+gc_alloc b 0 8
+gc_push_root b
+gc_pop_root
+gc_mark
+expect marked a
+expect unmarked b

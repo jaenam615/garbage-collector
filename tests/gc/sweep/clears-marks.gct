@@ -1,0 +1,13 @@
+echo 살아남은 객체의 mark bit는 꺼진다 (다음 GC를 위해)
+gc_create 4096
+gc_alloc a 0 8
+gc_alloc b 0 8
+object_set_marked a 1
+object_set_marked b 1
+gc_sweep
+expect result == 0
+expect unmarked a
+expect unmarked b
+gc_sweep
+expect result == 2
+expect live == 0

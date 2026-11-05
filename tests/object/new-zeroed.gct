@@ -1,0 +1,4 @@
+echo 새 객체는 refs NULL, data 0, mark 꺼짐
+heap_create 4096
+object_new a 3 32
+expect zeroed a

@@ -1,0 +1,11 @@
+echo 부모는 죽고, 따로 루트에 있는 자식만 산다
+gc_create 4096
+gc_alloc a 1 8
+gc_alloc b 0 8
+write b CHILD
+object_set_ref a 0 b
+gc_push_root b
+gc_collect
+expect freed == 1
+expect live == 1
+expect data b CHILD

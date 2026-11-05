@@ -1,0 +1,15 @@
+echo mark bit 켜고 끄기. 다른 객체나 필드에 영향이 없어야 한다
+heap_create 4096
+object_new a 2 16
+object_new b 2 16
+object_set_ref a 0 b
+write a AAAAAAAAAAAAAAAA
+expect unmarked a
+object_set_marked a 1
+expect marked a
+expect unmarked b
+expect ref a 0 b
+expect data a AAAAAAAAAAAAAAAA
+expect shape a 2 16
+object_set_marked a 0
+expect unmarked a

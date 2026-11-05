@@ -1,0 +1,8 @@
+echo gc_mark는 mark만 한다. 아무것도 해제하지 않는다
+gc_create 4096
+gc_alloc a 0 8
+gc_alloc b 0 8
+gc_alloc c 0 8
+gc_mark
+expect live == 3
+expect collections == 0

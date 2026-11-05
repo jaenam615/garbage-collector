@@ -1,0 +1,9 @@
+echo 블록 하나 할당
+heap_create 1024
+heap_alloc p 32
+expect notnull p
+expect blocks == 1
+expect used >= 32
+write p 0123456789abcdef0123456789abcdef
+expect data p 0123456789abcdef0123456789abcdef
+expect walk

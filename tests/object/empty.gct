@@ -1,0 +1,9 @@
+echo refs도 data도 없는 객체도 서로 다른 주소를 가져야 한다
+heap_create 4096
+object_new a 0 0
+object_new b 0 0
+expect notnull a
+expect notnull b
+expect differ a b
+expect shape a 0 0
+expect walk

@@ -1,0 +1,14 @@
+echo 앞 블록을 먼저 해제하고 뒤 블록을 해제: 두 구멍이 합쳐져야 큰 요청이 들어간다
+heap_create 4096
+heap_alloc a 1000
+heap_alloc b 1000
+heap_alloc c 1000
+write c KEEP_C
+heap_alloc d 1500
+expect null d
+heap_free a
+heap_free b
+heap_alloc d 1500
+expect notnull d
+expect data c KEEP_C
+expect walk

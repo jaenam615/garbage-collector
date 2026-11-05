@@ -1,0 +1,25 @@
+echo 중간중간 해제하고, 생긴 구멍에 새로 할당해도 살아있는 객체가 멀쩡해야 한다
+gc_create 4096
+gc_alloc a 0 32
+gc_alloc b 0 32
+gc_alloc c 0 32
+gc_alloc d 0 32
+gc_alloc e 0 32
+write a AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+write c CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+write e EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+object_set_marked a 1
+object_set_marked c 1
+object_set_marked e 1
+gc_sweep
+expect result == 2
+gc_alloc x 0 32
+write x XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+gc_alloc y 0 32
+write y YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY
+expect live == 5
+expect data a AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+expect data c CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+expect data e EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+expect data x XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+expect data y YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY

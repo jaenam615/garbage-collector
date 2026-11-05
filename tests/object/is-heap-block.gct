@@ -1,0 +1,7 @@
+echo Object*는 heap_alloc이 돌려준 주소와 같아야 한다 (sweep이 힙을 순회할 때 필요)
+heap_create 4096
+object_new a 1 8
+object_new b 2 8
+heap_alloc p 16
+object_new c 0 0
+expect walk

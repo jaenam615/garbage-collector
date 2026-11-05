@@ -1,0 +1,16 @@
+echo 공유된 자식: a -> b -> d, a -> c -> d
+gc_create 4096
+gc_alloc a 2 0
+gc_push_root a
+gc_alloc b 1 0
+gc_alloc c 1 0
+gc_alloc d 0 8
+object_set_ref a 0 b
+object_set_ref a 1 c
+object_set_ref b 0 d
+object_set_ref c 0 d
+gc_mark
+expect marked a
+expect marked b
+expect marked c
+expect marked d

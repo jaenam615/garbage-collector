@@ -1,0 +1,15 @@
+echo 연속으로 할당한 블록끼리 겹치면 안 된다 (헤더 크기 계산 실수 잡기)
+heap_create 4096
+heap_alloc a 16
+heap_alloc b 16
+heap_alloc c 16
+expect differ a b
+expect differ b c
+write a AAAAAAAAAAAAAAAA
+write b BBBBBBBBBBBBBBBB
+write c CCCCCCCCCCCCCCCC
+expect data a AAAAAAAAAAAAAAAA
+expect data b BBBBBBBBBBBBBBBB
+expect data c CCCCCCCCCCCCCCCC
+expect blocks == 3
+expect walk

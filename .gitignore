@@ -1,0 +1,9 @@
+build/
+*.dSYM/
+.DS_Store
+
+/build/
+/main
+/main.dSYM/
+*.o
+/archive/

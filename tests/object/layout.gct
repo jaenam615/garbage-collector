@@ -1,0 +1,26 @@
+echo refs와 data가 서로, 그리고 옆 객체와 겹치면 안 된다 (객체 크기 계산 실수 잡기)
+heap_create 4096
+object_new a 3 24
+object_new b 2 24
+object_new c 1 24
+object_set_ref a 0 b
+object_set_ref a 1 c
+object_set_ref a 2 a
+object_set_ref b 0 c
+object_set_ref b 1 a
+object_set_ref c 0 a
+write a AAAAAAAAAAAAAAAAAAAAAAAA
+write b BBBBBBBBBBBBBBBBBBBBBBBB
+write c CCCCCCCCCCCCCCCCCCCCCCCC
+expect ref a 0 b
+expect ref a 1 c
+expect ref a 2 a
+expect ref b 0 c
+expect ref b 1 a
+expect ref c 0 a
+expect data a AAAAAAAAAAAAAAAAAAAAAAAA
+expect data b BBBBBBBBBBBBBBBBBBBBBBBB
+expect data c CCCCCCCCCCCCCCCCCCCCCCCC
+expect shape a 3 24
+expect shape b 2 24
+expect shape c 1 24
