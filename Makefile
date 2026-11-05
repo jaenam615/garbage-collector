@@ -17,7 +17,7 @@ $(RUNNER): tests/test_runner.c $(SRCS) $(HDRS)
 
 # 전체:                    make check
 # 섹션별:                  make check-heap   check-object   check-gc
-#                          make check-mark   check-sweep    check-integration
+#                          make check-mark   check-sweep    check-integration   check-gen
 # 여러 개 / 이름 일부:      make check F="heap object"     make check F=coalesce
 check: $(RUNNER)
 	@python3 tests/run.py $(F)

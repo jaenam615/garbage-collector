@@ -1,0 +1,6 @@
+echo Eden이 꽉 차면 gen_alloc이 스스로 minor GC를 돌린다
+gen_create 1K 1K 16K 3
+repeat 1000 gen_alloc t 0 32
+expect notnull t
+expect minor_gcs >= 1
+expect old_objects == 0

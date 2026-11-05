@@ -44,4 +44,31 @@ void *object_data(Object *obj);
 bool object_is_marked(const Object *obj);
 void object_set_marked(Object *obj, bool marked);
 
+/*
+ * ---------------- Project 6에서 추가 ----------------
+ * copying GC는 객체를 통째로 다른 곳에 복사한다. 그러려면 객체 크기를 알아야 하고,
+ * Heap이 아닌 메모리(Eden, Survivor)에도 객체를 만들 수 있어야 한다.
+ * 또 JVM의 mark word처럼 헤더에 age와 forwarding pointer를 둔다.
+ */
+
+/* num_refs, data_size인 객체가 차지하는 전체 바이트 (헤더 포함). HEAP_ALIGNMENT의 배수. */
+size_t object_size_for(size_t num_refs, size_t data_size);
+
+/* obj가 차지하는 전체 바이트. object_size_for(num_refs, data_size)와 같다. */
+size_t object_size(const Object *obj);
+
+/*
+ * object_size_for(num_refs, data_size) 바이트 이상인 mem 위에 새 객체를 만든다.
+ * object_new와 같은 초기 상태: refs NULL, data 0, mark 꺼짐, age 0, forwarding NULL.
+ */
+Object *object_init(void *mem, size_t num_refs, size_t data_size);
+
+/* 이 객체가 살아남은 minor GC 횟수 */
+unsigned object_age(const Object *obj);
+void object_set_age(Object *obj, unsigned age);
+
+/* 복사된 객체의 새 주소. 아직 복사되지 않았으면 NULL. */
+Object *object_forwarded(const Object *obj);
+void object_set_forwarded(Object *obj, Object *new_location);
+
 #endif

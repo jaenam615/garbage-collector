@@ -1,0 +1,16 @@
+echo 순환 참조도 한 번씩만 복사. 루트에서 끊긴 사이클은 복사되지 않는다
+gen_create 4K 4K 64K 3
+gen_alloc a 1 8
+gen_push_root a
+gen_alloc b 1 8
+gen_push_root b
+gen_write_ref a 0 b
+gen_write_ref b 0 a
+gen_alloc x 1 8
+gen_alloc y 1 8
+gen_write_ref x 0 y
+gen_write_ref y 0 x
+gen_minor_gc
+expect copied == 2
+expect ref a 0 b
+expect ref b 0 a

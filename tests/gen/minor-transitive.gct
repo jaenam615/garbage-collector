@@ -1,0 +1,15 @@
+echo 루트에서 참조를 따라 닿는 객체를 전부 복사하고, 참조도 새 주소로 고친다
+gen_create 4K 4K 64K 3
+gen_alloc a 1 8
+gen_push_root a
+gen_alloc b 0 8
+write b CHILD
+gen_write_ref a 0 b
+gen_list chain 5
+gen_push_root chain
+gen_alloc garbage 1 8
+gen_minor_gc
+expect copied == 7
+expect refspace a 0 survivor
+expect refdata a 0 CHILD
+expect listlen chain 5

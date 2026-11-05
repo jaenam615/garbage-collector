@@ -1,0 +1,14 @@
+echo object_init: Heap이 아닌 아무 메모리 위에 객체 만들기. object_size_for와 object_size가 일치해야 한다
+heap_create 4096
+heap_alloc p 512
+object_init a p 2 13
+expect objsize a
+expect shape a 2 13
+expect zeroed a
+expect age a 0
+expect forwarded a null
+heap_alloc q 512
+write q GARBAGE_GARBAGE_GARBAGE_GARBAGE_GARBAGE_GARBAGE
+object_init b q 3 24
+expect zeroed b
+expect forwarded b null

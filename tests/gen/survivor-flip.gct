@@ -1,0 +1,17 @@
+echo minor GC마다 Survivor 두 개가 역할을 바꾸므로, 살아남은 객체는 매번 이동하고 age가 오른다
+gen_create 4K 4K 64K 15
+gen_alloc a 0 16
+write a FLIP
+gen_push_root a
+gen_minor_gc
+remember a
+gen_minor_gc
+expect moved a
+expect space a survivor
+expect age a 2
+remember a
+gen_minor_gc
+expect moved a
+expect age a 3
+expect data a FLIP
+expect old_objects == 0

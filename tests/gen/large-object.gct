@@ -1,0 +1,9 @@
+echo Eden보다 큰 객체는 Old에 바로 할당한다
+gen_create 1K 1K 64K 3
+gen_alloc big 0 2000
+expect notnull big
+expect space big old
+expect old_objects == 1
+expect eden_used == 0
+gen_alloc huge 0 100000
+expect null huge

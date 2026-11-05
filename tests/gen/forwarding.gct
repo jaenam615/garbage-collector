@@ -1,0 +1,15 @@
+echo 두 객체가 같은 자식을 가리키면 자식은 한 번만 복사된다 (forwarding pointer)
+gen_create 4K 4K 64K 3
+gen_alloc a 1 8
+gen_push_root a
+gen_alloc b 1 8
+gen_push_root b
+gen_alloc c 0 8
+write c SHARED
+gen_write_ref a 0 c
+gen_write_ref b 0 c
+gen_minor_gc
+expect copied == 3
+expect sameref a 0 b 0
+expect refdata a 0 SHARED
+expect refspace b 0 survivor

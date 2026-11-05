@@ -2,7 +2,7 @@
 """GC 테스트 러너 (PintOS 스타일).
 
     python3 tests/run.py                  # 전체
-    python3 tests/run.py heap             # 섹션 하나 (heap, object, gc, mark, sweep, integration)
+    python3 tests/run.py heap             # 섹션 하나 (heap, object, gc, mark, sweep, integration, gen)
     python3 tests/run.py mark sweep       # 여러 섹션
     python3 tests/run.py coalesce         # 이름에 coalesce가 들어간 테스트
     python3 tests/run.py -v heap/split    # 실패한 테스트의 전체 출력까지
@@ -22,8 +22,8 @@ BIN = ROOT / "build" / "test_runner"
 OUT = ROOT / "build" / "tests"
 TIMEOUT = 10
 
-# 진행 순서 (README의 Project 1~5)
-SECTION_ORDER = ["heap", "object", "gc/mark", "gc/sweep", "gc/integration"]
+# 진행 순서 (README의 Project 1~6)
+SECTION_ORDER = ["heap", "object", "gc/mark", "gc/sweep", "gc/integration", "gen"]
 
 USE_COLOR = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 

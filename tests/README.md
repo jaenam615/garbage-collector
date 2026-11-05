@@ -8,12 +8,13 @@ GC 모드에서 자동 GC 뒤에도 쓸 객체는 `gc_push_root`로 루트에 �
 
 숫자에는 `64K`, `8M`처럼 단위를 붙일 수 있습니다.
 
-## 시작 (둘 중 하나, 맨 처음에 한 번)
+## 시작 (셋 중 하나, 맨 처음에 한 번)
 
 | 명령 | 의미 |
 |---|---|
 | `heap_create SIZE` | heap 모드: heap / object 함수를 직접 테스트 |
 | `gc_create SIZE` | gc 모드: GC를 통해 테스트 |
+| `gen_create EDEN SURVIVOR OLD THRESHOLD` | gen 모드: 세대별 GC (Project 6) |
 
 ## heap 모드
 
@@ -38,6 +39,28 @@ GC 모드에서 자동 GC 뒤에도 쓸 객체는 `gc_push_root`로 루트에 �
 | `gc_list A N` | `refs[0]`으로 이어진 길이 N 리스트. 만드는 동안만 루트에 있음 |
 | `gc_fanout A` | A의 모든 ref 슬롯에 새 자식 객체 연결 |
 | `dump` | `gc_dump(gc, stdout)` |
+
+## gen 모드 (Project 6)
+
+객체가 움직이므로, 루트는 **변수 자체**입니다. `gen_push_root a`는 변수 `a`의 주소를 등록하고,
+GC가 객체를 옮기면 `a`의 값이 바뀝니다. GC가 돈 뒤 루트가 아닌 변수를 쓰면 SCRIPT ERROR가 납니다 (옮겨졌을 수 있으므로).
+
+| 명령 | 의미 |
+|---|---|
+| `gen_alloc A REFS DATA` | `A = gen_alloc(gc, REFS, DATA)` |
+| `gen_write_ref A I B` / `... null` | `gen_write_ref(gc, A, I, B)` (write barrier) |
+| `gen_push_root A` / `gen_pop_root` / `gen_pop_all` | 변수 A를 루트로 등록 / 해제 |
+| `gen_minor_gc` / `gen_major_gc` | GC 실행 |
+| `gen_list A N` | `refs[0]`으로 이어진 길이 N 리스트 (만드는 동안 A가 루트) |
+| `remember A` | 지금 A의 주소를 기억 (`expect moved/stayed`용) |
+
+heap 모드에서 Project 6의 객체 함수를 테스트하는 명령:
+
+| 명령 | 의미 |
+|---|---|
+| `object_init A P REFS DATA` | `A = object_init(P, REFS, DATA)`. P는 `heap_alloc`으로 받은 메모리 |
+| `object_set_age A N` | `object_set_age(A, N)` |
+| `object_set_forwarded A B` / `... null` | `object_set_forwarded(A, B)` |
 
 ## 공통
 
@@ -70,6 +93,14 @@ GC 모드에서 자동 GC 뒤에도 쓸 객체는 `gc_push_root`로 루트에 �
 | `expect all-marked A` | A에서 도달 가능한 모든 객체가 mark 됨 |
 | `expect listlen A N` | `gc_list`로 만든 리스트가 길이 N이고 내용이 안 깨짐 |
 | `expect fill-intact` | `heap_fill`/`gc_fill`로 만든 블록 내용이 안 깨짐 |
+| `expect space A eden\|survivor\|old\|none` | `gen_space_of(gc, A)` |
+| `expect refspace A I SPACE` | A.refs[I]가 있는 공간. 옮겨진 뒤 갱신 안 된 포인터는 `none` |
+| `expect refdata A I TEXT` | A.refs[I]의 데이터가 TEXT로 시작 |
+| `expect sameref A I B J` | A.refs[I]와 B.refs[J]가 같은 객체 |
+| `expect age A N` | `object_age(A) == N` |
+| `expect moved A` / `stayed A` | `remember` 이후 주소가 바뀜 / 그대로 |
+| `expect forwarded A B` / `... null` | `object_forwarded(A) == B` |
+| `expect objsize A` | `object_size(A) == object_size_for(...)`, refs + data 이상, 8의 배수 |
 
 ### STAT
 
@@ -77,3 +108,4 @@ GC 모드에서 자동 GC 뒤에도 쓸 객체는 `gc_push_root`로 루트에 �
 |---|---|
 | heap | `size` `used` `blocks` `filled` |
 | gc | `heap` `used` `live` `collections` `freed` `roots` `result` `filled` |
+| gen | `eden_used` `survivor_used` `old_used` `old_objects` `minor_gcs` `major_gcs` `copied` `promoted` `roots` |

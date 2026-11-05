@@ -1,0 +1,15 @@
+echo 승격된 객체가 아직 young인 객체를 가리키면, 그 참조도 기억해야 한다 (write barrier를 거치지 않은 경우)
+gen_create 4K 4K 64K 2
+gen_alloc a 1 8
+gen_push_root a
+gen_minor_gc
+gen_alloc b 0 16
+write b YOUNG_B
+gen_write_ref a 0 b
+gen_minor_gc
+expect space a old
+expect refspace a 0 survivor
+gen_alloc filler 0 16
+gen_minor_gc
+expect refspace a 0 old
+expect refdata a 0 YOUNG_B

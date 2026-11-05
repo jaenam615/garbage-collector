@@ -1,0 +1,14 @@
+echo Old에서 루트가 끊긴 객체는 major GC에서 해제된다 (minor GC로는 안 된다)
+gen_create 4K 4K 64K 1
+gen_alloc a 0 16
+gen_push_root a
+gen_alloc b 0 16
+gen_push_root b
+gen_minor_gc
+expect old_objects == 2
+gen_pop_root
+gen_minor_gc
+expect old_objects == 2
+gen_major_gc
+expect old_objects == 1
+expect space a old

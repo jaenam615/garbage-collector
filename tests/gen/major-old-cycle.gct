@@ -1,0 +1,14 @@
+echo Old 안의 순환 참조 쓰레기도 major GC에서 해제된다
+gen_create 4K 4K 64K 1
+gen_alloc a 1 8
+gen_push_root a
+gen_alloc b 1 8
+gen_push_root b
+gen_write_ref a 0 b
+gen_write_ref b 0 a
+gen_minor_gc
+expect old_objects == 2
+gen_pop_all
+gen_major_gc
+expect old_objects == 0
+expect old_used == 0

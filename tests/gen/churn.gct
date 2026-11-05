@@ -1,0 +1,12 @@
+echo 짧게 살다 죽는 객체가 대부분일 때: young에서 대부분 정리되고, 오래 사는 리스트만 Old에 남는다
+gen_create 8K 8K 256K 3
+gen_list keep 50
+gen_push_root keep
+repeat 1000 gen_list tmp 10
+expect minor_gcs >= 3
+expect listlen keep 50
+expect space keep old
+gen_major_gc
+expect old_objects == 50
+expect eden_used == 0
+expect survivor_used == 0

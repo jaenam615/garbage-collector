@@ -1,0 +1,31 @@
+echo Survivor가 모자라면 나이와 상관없이 Old로 승격한다 (premature promotion)
+gen_create 4K 256 64K 15
+gen_alloc a 0 48
+write a AAAA
+gen_push_root a
+gen_alloc b 0 48
+write b BBBB
+gen_push_root b
+gen_alloc c 0 48
+write c CCCC
+gen_push_root c
+gen_alloc d 0 48
+write d DDDD
+gen_push_root d
+gen_alloc e 0 48
+write e EEEE
+gen_push_root e
+gen_alloc f 0 48
+write f FFFF
+gen_push_root f
+gen_minor_gc
+expect copied == 6
+expect promoted > 0
+expect survivor_used <= 256
+expect old_objects == promoted
+expect data a AAAA
+expect data b BBBB
+expect data c CCCC
+expect data d DDDD
+expect data e EEEE
+expect data f FFFF

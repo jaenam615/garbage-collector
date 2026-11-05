@@ -55,3 +55,50 @@ void object_set_marked(Object *obj, bool marked) {
     (void)marked;
     /* TODO */
 }
+
+/* ---------------- Project 6 ---------------- */
+
+size_t object_size_for(size_t num_refs, size_t data_size) {
+    (void)num_refs;
+    (void)data_size;
+    /* TODO */
+    return 0;
+}
+
+size_t object_size(const Object *obj) {
+    (void)obj;
+    /* TODO */
+    return 0;
+}
+
+Object *object_init(void *mem, size_t num_refs, size_t data_size) {
+    (void)mem;
+    (void)num_refs;
+    (void)data_size;
+    /* TODO */
+    return NULL;
+}
+
+unsigned object_age(const Object *obj) {
+    (void)obj;
+    /* TODO */
+    return 0;
+}
+
+void object_set_age(Object *obj, unsigned age) {
+    (void)obj;
+    (void)age;
+    /* TODO */
+}
+
+Object *object_forwarded(const Object *obj) {
+    (void)obj;
+    /* TODO */
+    return NULL;
+}
+
+void object_set_forwarded(Object *obj, Object *new_location) {
+    (void)obj;
+    (void)new_location;
+    /* TODO */
+}

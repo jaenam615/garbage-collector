@@ -11,6 +11,7 @@ JVM 스타일의 mark-and-sweep 가비지 컬렉터를 C로 바닥부터 직접 
   ✗ gc/mark          9/12  make check-mark
   ✗ gc/sweep         0/10  make check-sweep
   ✗ gc/integration   0/13  make check-integration
+  ✗ gen              0/25  make check-gen
 ```
 
 ## 목차
@@ -23,6 +24,7 @@ JVM 스타일의 mark-and-sweep 가비지 컬렉터를 C로 바닥부터 직접 
 - [Project 3: Mark](#project-3-mark)
 - [Project 4: Sweep](#project-4-sweep)
 - [Project 5: Integration](#project-5-integration)
+- [Project 6: Generational GC](#project-6-generational-gc)
 - [디버깅 가이드](#디버깅-가이드)
 - [FAQ](#faq)
 
@@ -59,7 +61,8 @@ make check
 ├── include/              # 공개 인터페이스 (= 과제 명세). 수정하지 마세요.
 │   ├── heap.h            #   Project 1
 │   ├── object.h          #   Project 2
-│   └── gc.h              #   Project 3 ~ 5
+│   ├── gc.h              #   Project 3 ~ 5
+│   └── gen.h             #   Project 6
 │
 ├── src/                  # 여러분이 구현할 곳
 │   ├── heap/
@@ -67,11 +70,16 @@ make check
 │   │   └── heap_internal.h   # struct Heap 정의 (heap 모듈 내부 전용)
 │   ├── object/
 │   │   └── object.c          # struct Object 정의 + 구현
-│   └── gc/
-│       ├── gc_internal.h     # struct GC 정의 (gc.c, mark.c, sweep.c 공용)
-│       ├── gc.c              # 생성/할당/루트/collect
-│       ├── mark.c            # Project 3
-│       └── sweep.c           # Project 4
+│   ├── gc/
+│   │   ├── gc_internal.h     # struct GC 정의 (gc.c, mark.c, sweep.c 공용)
+│   │   ├── gc.c              # 생성/할당/루트/collect
+│   │   ├── mark.c            # Project 3
+│   │   └── sweep.c           # Project 4
+│   └── gen/                  # Project 6
+│       ├── gen_internal.h    # struct GenGC 정의
+│       ├── gen.c             # 생성/할당/write barrier/루트
+│       ├── minor.c           # minor GC (copying)
+│       └── major.c           # major GC
 │
 ├── tests/
 │   ├── test_runner.c     # .gct 스크립트를 실행하는 C 프로그램
@@ -79,10 +87,11 @@ make check
 │   ├── README.md         # 테스트 스크립트 문법
 │   ├── heap/             # Project 1 테스트
 │   ├── object/           # Project 2 테스트
-│   └── gc/
-│       ├── mark/         # Project 3 테스트
-│       ├── sweep/        # Project 4 테스트
-│       └── integration/  # Project 5 테스트
+│   ├── gc/
+│   │   ├── mark/         # Project 3 테스트
+│   │   ├── sweep/        # Project 4 테스트
+│   │   └── integration/  # Project 5 테스트
+│   └── gen/              # Project 6 테스트
 │
 └── build/                # 빌드 결과물과 테스트 출력 (자동 생성)
 ```
@@ -90,7 +99,7 @@ make check
 계층은 아래에서 위로 쌓입니다. 위 계층은 아래 계층의 **공개 함수만** 씁니다.
 
 ```
-   gc.h       gc_alloc, gc_collect, 루트 관리       ← Project 3~5
+   gc.h  /  gen.h    mark-sweep GC  /  세대별 GC     ← Project 3~5 / 6
      │ uses
    object.h   객체 레이아웃: 헤더, refs, data       ← Project 2
      │ uses
@@ -108,7 +117,7 @@ make check
 
 ```sh
 make check                    # 전체
-make check-heap               # 섹션 하나: heap, object, mark, sweep, integration
+make check-heap               # 섹션 하나: heap, object, mark, sweep, integration, gen
 make check-gc                 # gc/ 아래 전부 (mark + sweep + integration)
 make check F="heap object"    # 여러 섹션
 make check F=coalesce         # 이름에 coalesce가 들어간 테스트만
@@ -402,6 +411,90 @@ JVM은 사용자가 GC를 부르기를 기다리지 않습니다. 할당할 공�
 
 ---
 
+## Project 6: Generational GC
+
+> 구현: `src/gen/`, `src/object/object.c`(추가 함수) · 명세: `include/gen.h`, `include/object.h` 아래쪽 · 테스트: `make check-gen`
+
+### 배경
+
+Project 5까지 만든 GC는 매번 힙 **전체**를 mark하고 sweep 합니다. 힙이 커지면 GC 한 번이 점점 길어집니다.
+
+그런데 실제 프로그램을 관찰하면 **대부분의 객체는 만들어지자마자 죽습니다** (weak generational hypothesis).
+요청 하나를 처리하는 동안 만든 임시 객체, 문자열 조각, 반복문 안의 객체 같은 것들입니다.
+JVM은 이 성질을 이용해 힙을 나이별로 나눕니다.
+
+```
+  ┌──────────────── Young ────────────────┐   ┌──────── Old ────────┐
+  │    Eden     │ Survivor 0 │ Survivor 1 │   │  Heap (Project 1)   │
+  │ 새 객체      │  살아남은   │  (비어 있음) │   │  오래 산 객체         │
+  └─────────────────────────────────────────┘   └─────────────────────┘
+        │  minor GC: 살아있는 것만 복사 ──▶ 빈 Survivor
+        │  여러 번 살아남으면 ──────────────────────────▶ Old로 승격
+```
+
+- **할당**: Eden에서 포인터를 앞으로 밀기만 하면 됩니다 (bump pointer). free list를 뒤질 필요가 없어서 매우 빠릅니다.
+- **minor GC**: young 영역만 봅니다. 살아있는 객체를 빈 Survivor로 **복사**하고 나면 Eden과 원래 Survivor는 통째로 비웁니다.
+  죽은 객체는 하나하나 해제할 필요조차 없습니다. 비용이 "살아있는 객체 수"에만 비례합니다.
+- **승격**: minor GC를 `tenure_threshold`번 살아남은 객체는 오래 살 것으로 보고 Old로 옮깁니다.
+- **major GC**: Old까지 포함해서 전체를 정리합니다. 여기서는 young을 전부 Old로 승격한 뒤 Old를 mark-and-sweep 합니다.
+
+C#(.NET)의 Gen0/Gen1/Gen2, JVM Serial/Parallel GC의 Young/Old가 이 구조입니다.
+
+### 객체가 움직인다
+
+copying GC는 객체를 다른 주소로 옮깁니다. 그러면 그 객체를 가리키던 모든 포인터를 고쳐야 합니다.
+
+1. **루트**: 그래서 `gen_push_root`는 객체가 아니라 **변수의 주소**(`Object **`)를 받습니다. GC가 객체를 옮기면 그 변수에 새 주소를 써 넣습니다.
+2. **다른 객체의 참조**: 복사된 객체의 refs를 훑으면서 하나씩 고칩니다.
+3. **같은 객체를 두 번 만나면?** 처음 복사할 때 원래 자리의 헤더에 새 주소(forwarding pointer)를 적어 둡니다.
+   두 번째로 만나면 복사하지 말고 그 주소를 쓰면 됩니다.
+
+### Old가 young을 가리키면?
+
+minor GC는 Old를 훑지 않습니다. 그런데 Old 객체만 young 객체를 가리키고 있다면, 그 young 객체는 루트에서 안 닿는 것처럼 보여서 사라집니다.
+
+```
+roots ──▶ [old: o] ──▶ [eden: y]      minor GC가 o를 안 보면 y는 쓰레기로 보인다
+```
+
+그래서 참조를 쓸 때마다 확인합니다 (**write barrier**). "Old 객체에 young 객체를 쓰는 순간"을 기록해 두고(**remembered set**),
+minor GC 때 이 기록을 루트처럼 함께 훑습니다. JVM은 이걸 card table로 구현합니다.
+테스트가 `object_set_ref` 대신 `gen_write_ref`를 쓰는 이유입니다.
+
+### 구현할 것
+
+| 위치 | 함수 |
+|---|---|
+| `object.c` | `object_size_for`, `object_size`, `object_init`, `object_age` / `set_age`, `object_forwarded` / `set_forwarded` |
+| `gen.c` | `gen_create`, `gen_destroy`, `gen_alloc`, `gen_write_ref`, `gen_push_root`, `gen_pop_root`, `gen_space_of`, `gen_stats` |
+| `minor.c` | `gen_minor_gc` |
+| `major.c` | `gen_major_gc` |
+
+Old 공간은 Project 1의 `Heap`을 그대로 쓰면 됩니다.
+
+### 테스트
+
+| 테스트 | 확인하는 것 |
+|---|---|
+| `object-init`, `object-header` | 객체 헤더 확장 (Heap 모드에서 테스트) |
+| `alloc-eden`, `large-object` | bump 할당, 정렬, Eden보다 큰 객체 |
+| `minor-unrooted`, `minor-copies-root`, `minor-transitive` | 복사와 포인터 갱신 |
+| `forwarding`, `root-and-ref`, `cycle` | 같은 객체는 한 번만 복사 |
+| `survivor-flip`, `tenure`, `survivor-overflow` | Survivor 교대, 나이, 승격 |
+| `write-barrier`, `barrier-overwrite`, `promoted-points-young` | remembered set |
+| `major-*` | major GC |
+| `auto-minor`, `auto-minor-keeps-roots`, `churn` | 자동 GC, 실제 같은 할당 패턴 |
+| `deep-minor`, `deep-major` | 길이 2만 리스트. 재귀로 복사/mark하면 스택 오버플로 |
+
+### 생각해 볼 것
+
+- 복사할 객체를 어디에 쌓아 둘까요? 사실 **to-space 자체가 큐**입니다. 복사된 객체를 앞에서부터 하나씩 훑으면서 그 자식을 뒤에 복사하면, 따로 스택 없이 BFS가 됩니다. ("Cheney's algorithm"으로 찾아보세요)
+- Old로 승격된 객체도 자식을 훑어야 합니다. 그런데 Old는 to-space가 아니니 위 방법으로는 안 훑어집니다. 어떻게 할까요?
+- 이번 GC에서 막 승격된 객체가 아직 young인 객체를 가리키면? 그 참조는 write barrier를 거치지 않았습니다. (`promoted-points-young`)
+- `gen_space_of`가 이미 비워진 Survivor의 옛 주소에 대해 `GEN_NONE`을 돌려주면, 갱신 안 된 포인터를 테스트가 잡아낼 수 있습니다.
+
+---
+
 ## 디버깅 가이드
 
 ### 1. 출력부터 본다
@@ -437,7 +530,7 @@ ASan 에러에서 멈추고 싶으면 `b __asan::ReportGenericError`를 걸어 �
 |---|---|
 | `heap-buffer-overflow` | 힙 영역(`malloc`으로 받은 큰 덩어리) 끝을 넘어 읽거나 씀. 마지막 블록 처리, 크기 계산 실수 |
 | `heap-use-after-free` | `heap_destroy`/`gc_destroy` 후 접근, 또는 해제한 루트 배열 접근 |
-| `stack-overflow` | 재귀 mark (`gc/mark/deep`) |
+| `stack-overflow` | 재귀 mark / 재귀 복사 (`gc/mark/deep`, `gen/deep-*`) |
 | `SEGV on unknown address` | 쓰레기 값을 포인터로 사용. 헤더가 덮어써졌을 가능성 |
 
 ---

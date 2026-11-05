@@ -1,0 +1,16 @@
+echo Old -> young 참조를 다시 끊으면 그 young 객체는 수거된다 (remembered set은 현재 값을 봐야 한다)
+gen_create 4K 4K 64K 1
+gen_alloc o 2 8
+gen_push_root o
+gen_minor_gc
+expect space o old
+gen_alloc y 0 16
+gen_write_ref o 0 y
+gen_alloc z 0 16
+write z KEEP_Z
+gen_write_ref o 1 z
+gen_write_ref o 0 null
+gen_minor_gc
+expect copied == 1
+expect ref o 0 null
+expect refdata o 1 KEEP_Z

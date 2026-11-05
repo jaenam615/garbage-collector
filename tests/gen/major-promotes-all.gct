@@ -1,0 +1,24 @@
+echo major GC는 살아있는 young 객체를 전부 Old로 옮기고 Old를 정리한다
+gen_create 4K 4K 64K 15
+gen_alloc a 0 16
+write a AAAA
+gen_push_root a
+gen_alloc b 0 16
+write b BBBB
+gen_push_root b
+gen_minor_gc
+gen_alloc c 0 16
+write c CCCC
+gen_push_root c
+gen_alloc garbage 0 16
+gen_major_gc
+expect space a old
+expect space b old
+expect space c old
+expect eden_used == 0
+expect survivor_used == 0
+expect old_objects == 3
+expect major_gcs == 1
+expect data a AAAA
+expect data b BBBB
+expect data c CCCC

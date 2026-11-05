@@ -1,0 +1,12 @@
+echo 길이 2만 리스트를 Old로 보내고 major GC. Old의 mark도 재귀면 터진다
+gen_create 4M 4M 8M 1
+gen_list head 20000
+gen_push_root head
+gen_minor_gc
+expect old_objects == 20000
+gen_major_gc
+expect old_objects == 20000
+expect listlen head 20000
+gen_pop_root
+gen_major_gc
+expect old_objects == 0

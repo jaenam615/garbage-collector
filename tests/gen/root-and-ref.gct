@@ -1,0 +1,12 @@
+echo 루트에서도, 다른 객체에서도 가리키는 객체는 한 번만 복사되고 양쪽 모두 새 주소를 본다
+gen_create 4K 4K 64K 3
+gen_alloc a 0 8
+write a ONCE
+gen_push_root a
+gen_alloc holder 1 8
+gen_push_root holder
+gen_write_ref holder 0 a
+gen_minor_gc
+expect copied == 2
+expect ref holder 0 a
+expect data a ONCE

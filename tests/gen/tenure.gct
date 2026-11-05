@@ -1,0 +1,21 @@
+echo minor GC를 tenure_threshold(3)번 살아남으면 Old로 승격. Old 객체는 minor GC에서 움직이지 않는다
+gen_create 4K 4K 64K 3
+gen_alloc a 0 16
+write a TENURED
+gen_push_root a
+gen_minor_gc
+expect space a survivor
+gen_minor_gc
+expect space a survivor
+expect age a 2
+gen_minor_gc
+expect space a old
+expect promoted == 1
+expect old_objects == 1
+expect survivor_used == 0
+remember a
+gen_minor_gc
+expect stayed a
+expect space a old
+expect copied == 0
+expect data a TENURED

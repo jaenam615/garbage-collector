@@ -6,6 +6,7 @@
  * 스크립트 문법은 tests/README.md 참고.
  */
 #include "gc.h"
+#include "gen.h"
 #include "heap.h"
 #include "object.h"
 
@@ -27,7 +28,7 @@
 
 /* ---------- 상태 ---------- */
 
-typedef enum { MODE_NONE, MODE_HEAP, MODE_GC } Mode;
+typedef enum { MODE_NONE, MODE_HEAP, MODE_GC, MODE_GEN } Mode;
 typedef enum { VAR_PTR, VAR_OBJ } VarKind;
 
 typedef struct {
@@ -37,6 +38,8 @@ typedef struct {
     size_t size;        /* VAR_PTR: 요청 크기, VAR_OBJ: data_size */
     size_t num_refs;    /* VAR_OBJ 전용 */
     bool freed;         /* heap_free로 해제됨 */
+    bool stale;         /* MODE_GEN: 루트가 아닌데 GC가 돌았음 (객체가 옮겨졌을 수 있음) */
+    void *remembered;   /* remember 명령으로 저장한 주소 */
 } Var;
 
 typedef struct {
@@ -47,6 +50,7 @@ typedef struct {
 static Mode mode;
 static Heap *heap;      /* MODE_HEAP */
 static GC *gc;          /* MODE_GC */
+static GenGC *gen;      /* MODE_GEN */
 
 static Var vars[MAX_VARS];
 static size_t num_vars;
@@ -54,7 +58,8 @@ static Let lets[MAX_LETS];
 static size_t num_lets;
 
 static size_t live_allocs;  /* MODE_HEAP: 러너가 아는 살아있는 블록 수 */
-static size_t root_depth;   /* MODE_GC: 러너가 push한 루트 수 */
+static size_t root_depth;   /* MODE_GC / MODE_GEN: 러너가 push한 루트 수 */
+static Var *gen_roots[256]; /* MODE_GEN: 루트로 등록한 변수들 */
 static size_t last_result;  /* gc_mark/gc_sweep/gc_collect의 반환값 */
 
 static void *fill_ptrs[MAX_FILL];
@@ -150,6 +155,10 @@ static Var *get_live_var(const char *name) {
     if (v->ptr == NULL) {
         script_error("'%s' is NULL (allocation failed earlier?)", name);
     }
+    if (v->stale) {
+        script_error("'%s' is stale: it is not a root and a GC ran, so the object may have moved."
+                     " Use gen_push_root %s", name, name);
+    }
     if (v->freed) {
         script_error("'%s' was already freed", name);
     }
@@ -178,6 +187,7 @@ static Var *set_var(const char *name, VarKind kind, void *ptr, size_t size, size
     v->size = size;
     v->num_refs = num_refs;
     v->freed = false;
+    v->stale = false;
     return v;
 }
 
@@ -233,6 +243,20 @@ static bool stat_value(const char *name, size_t *out) {
         if (strcmp(name, "size") == 0)        *out = s.size;
         else if (strcmp(name, "used") == 0)   *out = s.used_bytes;
         else if (strcmp(name, "blocks") == 0) *out = s.num_blocks;
+        else return false;
+        return true;
+    }
+    if (mode == MODE_GEN) {
+        GenStats s = gen_stats(gen);
+        if (strcmp(name, "eden_used") == 0)          *out = s.eden_used;
+        else if (strcmp(name, "survivor_used") == 0) *out = s.survivor_used;
+        else if (strcmp(name, "old_used") == 0)      *out = s.old_used;
+        else if (strcmp(name, "old_objects") == 0)   *out = s.old_objects;
+        else if (strcmp(name, "minor_gcs") == 0)     *out = s.minor_gcs;
+        else if (strcmp(name, "major_gcs") == 0)     *out = s.major_gcs;
+        else if (strcmp(name, "copied") == 0)        *out = s.last_copied;
+        else if (strcmp(name, "promoted") == 0)      *out = s.last_promoted;
+        else if (strcmp(name, "roots") == 0)         *out = root_depth;
         else return false;
         return true;
     }
@@ -332,6 +356,24 @@ static void expect_walk(void) {
         if (!found) {
             check_failed("heap walk did not return %s (%p)", v->name, v->ptr);
         }
+    }
+}
+
+static GenSpace parse_space(const char *tok) {
+    if (strcmp(tok, "eden") == 0) return GEN_EDEN;
+    if (strcmp(tok, "survivor") == 0) return GEN_SURVIVOR;
+    if (strcmp(tok, "old") == 0) return GEN_OLD;
+    if (strcmp(tok, "none") == 0) return GEN_NONE;
+    script_error("unknown space '%s' (eden, survivor, old, none)", tok);
+    return GEN_NONE;
+}
+
+static const char *space_name(GenSpace s) {
+    switch (s) {
+    case GEN_EDEN: return "eden";
+    case GEN_SURVIVOR: return "survivor";
+    case GEN_OLD: return "old";
+    default: return "none";
     }
 }
 
@@ -475,6 +517,98 @@ static void cmd_expect(int argc, char **argv) {
     } else if (strcmp(what, "all-marked") == 0) {
         need_args(argc, 3, "expect all-marked VAR");
         expect_all_marked(get_obj_var(argv[2]));
+    } else if (strcmp(what, "space") == 0) {
+        need_args(argc, 4, "expect space VAR eden|survivor|old|none");
+        need_mode(MODE_GEN, "expect space");
+        Var *v = get_obj_var(argv[2]);
+        GenSpace want = parse_space(argv[3]);
+        GenSpace got = gen_space_of(gen, v->ptr);
+        if (got != want) {
+            check_failed("expected %s to be in %s, got %s", v->name, argv[3], space_name(got));
+        }
+    } else if (strcmp(what, "refspace") == 0) {
+        need_args(argc, 5, "expect refspace VAR INDEX eden|survivor|old|none");
+        need_mode(MODE_GEN, "expect refspace");
+        Var *v = get_obj_var(argv[2]);
+        size_t idx = parse_size(argv[3]);
+        if (idx >= v->num_refs) {
+            script_error("%s has only %zu refs", v->name, v->num_refs);
+        }
+        GenSpace want = parse_space(argv[4]);
+        Object *r = object_get_ref(v->ptr, idx);
+        GenSpace got = gen_space_of(gen, r);
+        if (got != want) {
+            check_failed("expected %s.refs[%zu] (%p) to be in %s, got %s%s", v->name, idx, (void *)r,
+                         argv[4], space_name(got),
+                         got == GEN_NONE && r != NULL ? " (stale pointer: not updated after the object moved?)" : "");
+        }
+    } else if (strcmp(what, "refdata") == 0) {
+        need_args(argc, 5, "expect refdata VAR INDEX TEXT");
+        Var *v = get_obj_var(argv[2]);
+        size_t idx = parse_size(argv[3]);
+        if (idx >= v->num_refs) {
+            script_error("%s has only %zu refs", v->name, v->num_refs);
+        }
+        Object *r = object_get_ref(v->ptr, idx);
+        size_t len = strlen(argv[4]);
+        if (r == NULL) {
+            check_failed("expected %s.refs[%zu] to have data \"%s\", but it is NULL", v->name, idx, argv[4]);
+        } else if (object_data_size(r) < len || memcmp(object_data(r), argv[4], len) != 0) {
+            check_failed("expected %s.refs[%zu] data to start with \"%s\", got \"%.*s\"", v->name, idx,
+                         argv[4], (int)len, (const char *)object_data(r));
+        }
+    } else if (strcmp(what, "sameref") == 0) {
+        need_args(argc, 6, "expect sameref VAR INDEX VAR INDEX");
+        Var *a = get_obj_var(argv[2]);
+        Var *b = get_obj_var(argv[4]);
+        Object *ra = object_get_ref(a->ptr, parse_size(argv[3]));
+        Object *rb = object_get_ref(b->ptr, parse_size(argv[5]));
+        if (ra != rb) {
+            check_failed("expected %s.refs[%s] and %s.refs[%s] to be the same object, got %p and %p"
+                         " (copied twice? check the forwarding pointer)",
+                         a->name, argv[3], b->name, argv[5], (void *)ra, (void *)rb);
+        }
+    } else if (strcmp(what, "age") == 0) {
+        need_args(argc, 4, "expect age VAR N");
+        Var *v = get_obj_var(argv[2]);
+        size_t want = parse_size(argv[3]);
+        if (object_age(v->ptr) != want) {
+            check_failed("expected %s to have age %zu, got %u", v->name, want, object_age(v->ptr));
+        }
+    } else if (strcmp(what, "moved") == 0 || strcmp(what, "stayed") == 0) {
+        need_args(argc, 3, "expect moved|stayed VAR");
+        Var *v = get_obj_var(argv[2]);
+        if (v->remembered == NULL) {
+            script_error("use 'remember %s' first", v->name);
+        }
+        bool want_moved = strcmp(what, "moved") == 0;
+        if ((v->ptr != v->remembered) != want_moved) {
+            check_failed("expected %s to have %s (was %p, now %p)%s", v->name,
+                         want_moved ? "moved" : "stayed in place", v->remembered, v->ptr,
+                         want_moved ? " (root slot not updated?)" : "");
+        }
+    } else if (strcmp(what, "forwarded") == 0) {
+        need_args(argc, 4, "expect forwarded VAR VAR|null");
+        Var *v = get_obj_var(argv[2]);
+        Object *want = resolve_obj(argv[3]);
+        if (object_forwarded(v->ptr) != want) {
+            check_failed("expected forwarding of %s to be %s (%p), got %p", v->name, argv[3],
+                         (void *)want, (void *)object_forwarded(v->ptr));
+        }
+    } else if (strcmp(what, "objsize") == 0) {
+        need_args(argc, 3, "expect objsize VAR");
+        Var *v = get_obj_var(argv[2]);
+        size_t got = object_size(v->ptr);
+        size_t want = object_size_for(v->num_refs, v->size);
+        size_t min = v->num_refs * sizeof(Object *) + v->size;
+        if (got != want) {
+            check_failed("object_size(%s) = %zu but object_size_for(%zu, %zu) = %zu",
+                         v->name, got, v->num_refs, v->size, want);
+        } else if (got < min) {
+            check_failed("object_size(%s) = %zu is smaller than refs + data (%zu)", v->name, got, min);
+        } else if (got % HEAP_ALIGNMENT != 0) {
+            check_failed("object_size(%s) = %zu is not a multiple of %d", v->name, got, HEAP_ALIGNMENT);
+        }
     } else if (strcmp(what, "walk") == 0) {
         need_args(argc, 2, "expect walk");
         expect_walk();
@@ -574,11 +708,90 @@ static void cmd_fill(bool obj, size_t num_refs, size_t size, bool trace) {
     }
 }
 
+static void gen_push_var(Var *v) {
+    if (root_depth == 256) {
+        script_error("too many roots");
+    }
+    gen_push_root(gen, (Object **)&v->ptr);
+    gen_roots[root_depth++] = v;
+}
+
+static void gen_pop_var(void) {
+    if (root_depth == 0) {
+        script_error("gen_pop_root with empty root stack");
+    }
+    gen_pop_root(gen);
+    root_depth--;
+}
+
+static void cmd_gen_list(const char *name, size_t n) {
+    /* 노드 i의 data = i, head가 가장 마지막 노드. 변수 자체를 루트로 등록해 두고 만든다. */
+    Var *head = set_var(name, VAR_OBJ, NULL, sizeof(size_t), 1);
+    gen_push_var(head);
+    for (size_t i = 0; i < n; i++) {
+        Object *node = gen_alloc(gen, 1, sizeof(size_t));  /* 여기서 GC가 돌면 head->ptr이 바뀐다 */
+        if (node == NULL) {
+            check_failed("gen_list %s: gen_alloc returned NULL at node %zu of %zu", name, i, n);
+            break;
+        }
+        gen_write_ref(gen, node, 0, head->ptr);
+        memcpy(object_data(node), &i, sizeof i);
+        head->ptr = node;
+    }
+    gen_pop_var();
+}
+
+static size_t gen_gc_count(void) {
+    GenStats s = gen_stats(gen);
+    return s.minor_gcs + s.major_gcs;
+}
+
+/* GC가 돌았으면 루트가 아닌 변수는 더 이상 믿을 수 없다 */
+static void gen_mark_stale(void) {
+    for (size_t i = 0; i < num_vars; i++) {
+        bool rooted = false;
+        for (size_t r = 0; r < root_depth; r++) {
+            if (gen_roots[r] == &vars[i]) {
+                rooted = true;
+                break;
+            }
+        }
+        if (!rooted && vars[i].kind == VAR_OBJ && vars[i].ptr != NULL) {
+            vars[i].stale = true;
+        }
+    }
+}
+
+static void exec_one(int argc, char **argv, bool trace);
+
 static void exec(int argc, char **argv, bool trace) {
+    if (mode != MODE_GEN) {
+        exec_one(argc, argv, trace);
+        return;
+    }
+    size_t before = gen_gc_count();
+    exec_one(argc, argv, trace);
+    if (gen_gc_count() != before) {
+        gen_mark_stale();
+    }
+}
+
+static void exec_one(int argc, char **argv, bool trace) {
     const char *cmd = argv[0];
 
     /* ---- 생성 ---- */
-    if (strcmp(cmd, "heap_create") == 0 || strcmp(cmd, "gc_create") == 0) {
+    if (strcmp(cmd, "gen_create") == 0) {
+        need_args(argc, 5, "gen_create EDEN SURVIVOR OLD TENURE_THRESHOLD");
+        if (mode != MODE_NONE) {
+            script_error("heap already created");
+        }
+        mode = MODE_GEN;
+        gen = gen_create(parse_size(argv[1]), parse_size(argv[2]), parse_size(argv[3]),
+                         (unsigned)parse_size(argv[4]));
+        if (gen == NULL) {
+            fatal_fail("gen_create returned NULL");
+        }
+    } else if (strcmp(cmd, "heap_create") == 0 || strcmp(cmd, "gc_create") == 0) {
         need_args(argc, 2, "heap_create|gc_create SIZE");
         if (mode != MODE_NONE) {
             script_error("heap already created");
@@ -722,6 +935,91 @@ static void exec(int argc, char **argv, bool trace) {
             object_set_ref(v->ptr, i, child);
         }
 
+    /* ---- gen (Project 6) ---- */
+    } else if (strcmp(cmd, "gen_alloc") == 0) {
+        need_args(argc, 4, "gen_alloc VAR NUM_REFS DATA_SIZE");
+        need_mode(MODE_GEN, cmd);
+        size_t refs = parse_size(argv[2]);
+        size_t size = parse_size(argv[3]);
+        Object *obj = gen_alloc(gen, refs, size);
+        set_var(argv[1], VAR_OBJ, obj, size, refs);
+        if (trace) {
+            printf("    %s = %p\n", argv[1], (void *)obj);
+        }
+    } else if (strcmp(cmd, "gen_write_ref") == 0) {
+        need_args(argc, 4, "gen_write_ref VAR INDEX VAR|null");
+        need_mode(MODE_GEN, cmd);
+        Var *v = get_obj_var(argv[1]);
+        size_t idx = parse_size(argv[2]);
+        if (idx >= v->num_refs) {
+            script_error("%s has only %zu refs", v->name, v->num_refs);
+        }
+        gen_write_ref(gen, v->ptr, idx, resolve_obj(argv[3]));
+    } else if (strcmp(cmd, "gen_push_root") == 0) {
+        need_args(argc, 2, "gen_push_root VAR");
+        need_mode(MODE_GEN, cmd);
+        Var *v = get_obj_var(argv[1]);
+        gen_push_var(v);
+    } else if (strcmp(cmd, "gen_pop_root") == 0) {
+        need_args(argc, 1, "gen_pop_root");
+        need_mode(MODE_GEN, cmd);
+        gen_pop_var();
+    } else if (strcmp(cmd, "gen_pop_all") == 0) {
+        need_args(argc, 1, "gen_pop_all");
+        need_mode(MODE_GEN, cmd);
+        while (root_depth > 0) {
+            gen_pop_var();
+        }
+    } else if (strcmp(cmd, "gen_minor_gc") == 0) {
+        need_args(argc, 1, cmd);
+        need_mode(MODE_GEN, cmd);
+        gen_minor_gc(gen);
+        if (trace) {
+            GenStats s = gen_stats(gen);
+            printf("    copied %zu, promoted %zu\n", s.last_copied, s.last_promoted);
+        }
+    } else if (strcmp(cmd, "gen_major_gc") == 0) {
+        need_args(argc, 1, cmd);
+        need_mode(MODE_GEN, cmd);
+        gen_major_gc(gen);
+        if (trace) {
+            GenStats s = gen_stats(gen);
+            printf("    promoted %zu, old_objects %zu\n", s.last_promoted, s.old_objects);
+        }
+    } else if (strcmp(cmd, "gen_list") == 0) {
+        need_args(argc, 3, "gen_list VAR N");
+        need_mode(MODE_GEN, cmd);
+        cmd_gen_list(argv[1], parse_size(argv[2]));
+    } else if (strcmp(cmd, "remember") == 0) {
+        need_args(argc, 2, "remember VAR");
+        Var *v = get_obj_var(argv[1]);
+        v->remembered = v->ptr;
+    } else if (strcmp(cmd, "object_init") == 0) {
+        need_args(argc, 5, "object_init VAR PTR NUM_REFS DATA_SIZE");
+        need_mode(MODE_HEAP, cmd);
+        Var *p = get_live_var(argv[2]);
+        if (p->kind != VAR_PTR) {
+            script_error("'%s' is not a heap_alloc pointer", p->name);
+        }
+        size_t refs = parse_size(argv[3]);
+        size_t size = parse_size(argv[4]);
+        if (object_size_for(refs, size) > p->size) {
+            script_error("%s (%zu bytes) is smaller than object_size_for(%zu, %zu) = %zu",
+                         p->name, p->size, refs, size, object_size_for(refs, size));
+        }
+        Object *obj = object_init(p->ptr, refs, size);
+        if (obj != p->ptr) {
+            check_failed("object_init returned %p, expected the given memory %p", (void *)obj, p->ptr);
+        }
+        p->freed = true; /* 이제 이 메모리는 객체 변수가 쓴다 */
+        set_var(argv[1], VAR_OBJ, p->ptr, size, refs);
+    } else if (strcmp(cmd, "object_set_age") == 0) {
+        need_args(argc, 3, "object_set_age VAR N");
+        object_set_age(get_obj_var(argv[1])->ptr, (unsigned)parse_size(argv[2]));
+    } else if (strcmp(cmd, "object_set_forwarded") == 0) {
+        need_args(argc, 3, "object_set_forwarded VAR VAR|null");
+        object_set_forwarded(get_obj_var(argv[1])->ptr, resolve_obj(argv[2]));
+
     /* ---- 공통 ---- */
     } else if (strcmp(cmd, "write") == 0) {
         need_args(argc, 3, "write VAR TEXT");
@@ -754,6 +1052,11 @@ static void exec(int argc, char **argv, bool trace) {
         if (mode == MODE_HEAP) {
             HeapStats s = heap_stats(heap);
             printf("    size=%zu used=%zu blocks=%zu\n", s.size, s.used_bytes, s.num_blocks);
+        } else if (mode == MODE_GEN) {
+            GenStats s = gen_stats(gen);
+            printf("    eden=%zu/%zu survivor=%zu/%zu old=%zu/%zu old_objects=%zu minor=%zu major=%zu\n",
+                   s.eden_used, s.eden_size, s.survivor_used, s.survivor_size, s.old_used, s.old_size,
+                   s.old_objects, s.minor_gcs, s.major_gcs);
         } else if (mode == MODE_GC) {
             GCStats s = gc_stats(gc);
             printf("    heap=%zu used=%zu live=%zu collections=%zu freed=%zu roots=%zu\n",
@@ -807,14 +1110,16 @@ static void *run_script(void *arg) {
         char display[MAX_LINE];
         snprintf(display, sizeof display, "%s", line);
 
+        /* echo는 토큰으로 나누지 않고 줄 전체를 그대로 출력 */
+        const char *start = display + strspn(display, " \t");
+        if (strncmp(start, "echo", 4) == 0 && (start[4] == '\0' || isspace((unsigned char)start[4]))) {
+            printf("  # %s\n", start + 4 + strspn(start + 4, " \t"));
+            continue;
+        }
+
         char *toks[MAX_TOKENS];
         int n = tokenize(line, toks);
         if (n == 0) {
-            continue;
-        }
-        if (strcmp(toks[0], "echo") == 0) {
-            const char *msg = strstr(display, "echo") + 4;
-            printf("  # %s\n", msg + strspn(msg, " \t"));
             continue;
         }
         printf("  %3d| %s\n", line_no, display + strspn(display, " \t"));
@@ -826,6 +1131,8 @@ static void *run_script(void *arg) {
         heap_destroy(heap);
     } else if (mode == MODE_GC) {
         gc_destroy(gc);
+    } else if (mode == MODE_GEN) {
+        gen_destroy(gen);
     }
     return NULL;
 }

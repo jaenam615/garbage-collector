@@ -1,0 +1,12 @@
+echo major GC 때 Old 객체가 가리키던 young 객체도 살아남아 Old로 간다
+gen_create 4K 4K 64K 1
+gen_alloc o 1 8
+gen_push_root o
+gen_minor_gc
+gen_alloc y 0 16
+write y YOUNG
+gen_write_ref o 0 y
+gen_major_gc
+expect refspace o 0 old
+expect refdata o 0 YOUNG
+expect old_objects == 2

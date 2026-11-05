@@ -1,0 +1,10 @@
+echo 루트가 없으면 minor GC는 아무것도 복사하지 않고 Eden을 통째로 비운다
+gen_create 4K 4K 64K 3
+gen_alloc a 1 8
+gen_alloc b 1 8
+gen_alloc c 0 8
+gen_minor_gc
+expect copied == 0
+expect eden_used == 0
+expect survivor_used == 0
+expect minor_gcs == 1

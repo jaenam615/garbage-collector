@@ -1,0 +1,8 @@
+echo 길이 2만 리스트를 minor GC로 복사. 재귀로 복사하면 256KB C 스택이 터진다 (Cheney 알고리즘)
+gen_create 4M 4M 8M 15
+gen_list head 20000
+gen_push_root head
+gen_minor_gc
+expect copied == 20000
+expect space head survivor
+expect listlen head 20000

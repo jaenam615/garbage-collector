@@ -1,0 +1,9 @@
+echo 자동 minor GC가 여러 번 돌아도 루트에서 닿는 리스트는 멀쩡하고, 결국 Old로 간다
+gen_create 4K 4K 64K 3
+gen_list keep 30
+gen_push_root keep
+repeat 2000 gen_alloc t 0 32
+expect minor_gcs >= 3
+expect listlen keep 30
+expect space keep old
+expect old_objects == 30

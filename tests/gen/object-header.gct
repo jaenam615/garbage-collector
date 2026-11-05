@@ -1,0 +1,19 @@
+echo age와 forwarding pointer는 헤더에 있고, refs/data/mark를 건드리지 않는다
+heap_create 4096
+heap_alloc p 256
+object_init a p 1 16
+heap_alloc q 256
+object_init b q 1 16
+write a AAAAAAAAAAAAAAAA
+object_set_ref a 0 b
+object_set_marked a 1
+object_set_age a 7
+object_set_forwarded a b
+expect age a 7
+expect forwarded a b
+expect ref a 0 b
+expect data a AAAAAAAAAAAAAAAA
+expect marked a
+expect shape a 1 16
+expect age b 0
+expect forwarded b null
